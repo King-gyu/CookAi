@@ -2,19 +2,22 @@ from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, nickname=None):
+    def create_user(self, email, password=None, nickname=None, **extra_fields):
+        extra_fields.setdefault('nickname', 'default_nickname')
         if not email:
             raise ValueError("Users must have an email address.")
 
         user = self.model(
             email=self.normalize_email(email),
         )
-        user.nickname = nickname
+        user.nickname = nickname or 'default_nickname'
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None):
+    def create_superuser(self, email, password=None, nickname=None, **extra_fields):
+        extra_fields.pop('nickname', None)
+        nickname = nickname or 'default_nickname'
         user = self.create_user(
             email=self.normalize_email(email),
             password=password,
@@ -31,7 +34,7 @@ class User(AbstractBaseUser):
         unique=True,
     )
 
-    nickname = models.CharField("닉네임", max_length=20, unique=True)
+    nickname = models.CharField("닉네임", max_length=20)
     intro = models.TextField("자기소개", null=True, blank=True)
     avatar = models.URLField(blank=True)
     is_active = models.BooleanField(default=True)
