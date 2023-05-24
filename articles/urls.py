@@ -5,9 +5,15 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from . import views
 
 urlpatterns = [
-    path('articles/', views.ArticleListCreateView.as_view()),
-    path('articles/<int:pk>/', views.ArticleRetrieveUpdateDestroyView.as_view()),
-    path('articles/<int:article_pk>/comments/', views.CommentListCreateView.as_view()),
-    path('articles/<int:article_pk>/comments/<int:pk>/', views.CommentRetrieveUpdateDestroyView.as_view()),
-    path('articles/list/', views.article_list),
+    path('', views.ArticleCreateView.as_view(), name='article_create'),
+    path('<int:pk>/update/', views.ArticleUpdateView.as_view(), name='article_update'),
+    path('<int:pk>/delete/', views.ArticleDeleteView.as_view(), name='article_delete'),
+    path('<int:pk>/', views.ArticleDetailView.as_view(), name='article_detail'),
+    path('list/', views.ArticleListView.as_view(), name='article_list'),
+    
+    path('<int:pk>/comments/', views.CommentCreateView.as_view(), name='comment_create'),
+    path('<int:pk>/comments/<int:comment_pk>/', views.CommentUpdateView.as_view(), name='comment_update'),
+    path('<int:pk>/comments/<int:comment_pk>/delete/', views.CommentDeleteView.as_view(), name='comment_delete'),
+    path('<int:pk>/comments/<int:comment_pk>/detail/', views.CommentDetailView.as_view(), name='comment_detail'),
+    path('<int:pk>/comments/<int:comment_pk>/list/', views.CommentListView.as_view(), name='comment_list'),
 ]
