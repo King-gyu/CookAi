@@ -1,239 +1,181 @@
-import os
-import requests
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.contrib.auth import authenticate
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import DjangoUnicodeDecodeError, force_str, force_bytes
+from django.db.models.query_utils import Q
+from django.shortcuts import redirect
+from django.core.mail import EmailMessage
 
-from rest_framework.views import APIView
-from rest_framework.generics import get_object_or_404
+from rest_framework.authtoken.models import Token
 from rest_framework import status, permissions
+from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.generics import get_object_or_404
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.generics import CreateAPIView
+from rest_framework.parsers import MultiPartParser, FormParser
 
-from users.serializers import (
-    UserSerializer,
-    CustomTokenObtainPairSerializer,
-    FollowingSerializer,
-)
-from users.models import User
-
-
-class UserList(APIView):
-    def get(self, request):
-        user = User.objects.all()
-        serializer = UserSerializer(user, many=True)
-        return Response(serializer.data)
+from users.serializers import UserSerializer, CustomTokenObtainPairSerializer, UserProfileSerializer
+from .serializers import PasswordResetSerializer, SetNewPasswordSerializer, TokenSerializer, EmailThread, PasswordVerificationSerializer
+from .models import User
 
 
-class Me(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        if user:
-            serializer = UserSerializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+class Util:
+    @staticmethod
+    def send_email(message):
+        email = EmailMessage(subject=message["email_subject"], body=message["email_body"], to=[
+                             message["to_email"]])
+        EmailThread(email).start()
 
 
-class UserView(APIView):
+class SignupView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(status=status.HTTP_201_CREATED)
+            user = serializer.save()
+            user.is_active = False
+            user = serializer.save()
+
+            uid = urlsafe_b64encode(force_bytes(user.pk))
+            token = PasswordResetTokenGenerator().make_token(user)
+
+            email = user.email
+            authurl = f'http://127.0.0.1:8000/users/verify-email/{uid}/{token}/'
+            email_body = "이메일 인증" + authurl
+            message = {
+                "email_body": email_body,
+                "to_email": email,
+                "email_subject": "이메일 인증",
+            }
+            Util.send_email(message)
+            return Response({"message": "가입완료!"}, status=status.HTTP_201_CREATED)
         else:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": f"${serializer.errors}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+class VerifyEmailView(APIView):
+    def get(self, request, uidb64, token):
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        token_generator = PasswordResetTokenGenerator()
+        if user is not None and token_generator.check_token(user, token):
+            user.is_active = True
+            user.save()
+            return redirect ('http://127.0.0.1:8000/login.html')
+            #return redirect ('http://127.0.0.1:5500/login.html')
+        else:
+            return Response({"message": "잘못된 링크입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+class ProfileView(APIView):
+    def get_object(self, user_id):
+        return get_object_or_404(User, id=user_id)
 
     def get(self, request, user_id):
-        user = get_object_or_404(User, id=user_id)
-        serializer = UserSerializer(user)
+        user = self.get_object(user_id)
+        serializer = UserProfileSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def put(self, request, user_id):
-        user = get_object_or_404(User, id=user_id)
-        if request.user == user:
-            serializer = UserSerializer(user, data=request.data)
+    def patch(self, request, user_id):
+        user = self.get_object(user_id)
+        if user == request.user:
+            serializer = UserProfileSerializer(
+                user, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                return Response({"message": "수정완료!"}, status=status.HTTP_200_OK)
             else:
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response({"message": "권한이 없습니다!"}, status=status.HTTP_403_FORBIDDEN)
 
-    def delete(self, request, user_id):
-        user = get_object_or_404(User, id=user_id)
-        if request.user == user:
-            user.is_active = False
-            user.save()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+class UserDeleteView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        serializer = PasswordVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        password = serializer.validated_data['password']
+
+        if user.check_password(password):
+            user.delete()
+            return Response({'message': '탈퇴가 성공적으로 처리되었습니다.'}, status=status.HTTP_200_OK)
         else:
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response({'message': '비밀번호가 일치하지 않습니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class FollowView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    def get(self, request, user_id):
+        you = get_object_or_404(User, id=user_id)
+        serializer = UserProfileSerializer(you)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, user_id):
         you = get_object_or_404(User, id=user_id)
         me = request.user
-        is_follow = request.data.get("is_follow")
-
-        if is_follow:
-            you.followers.add(me)
+        if me.is_authenticated:
+            if you != request.user:
+                if me in you.followers.all():
+                    you.followers.remove(me)
+                    return Response("unfollow했습니다.", status=status.HTTP_200_OK)
+                else:
+                    you.followers.add(me)
+                    return Response("follow했습니다.", status=status.HTTP_200_OK)
+            else:
+                return Response("자신을 팔로우 할 수 없습니다.", status=status.HTTP_400_BAD_REQUEST)
         else:
-            you.followers.remove(me)
-
-        serializer = FollowingSerializer(me.following, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response("로그인이 필요합니다.", status=status.HTTP_403_FORBIDDEN)
 
 
-class KaKaoLogin(APIView):
+class PasswordResetView(APIView):
     def post(self, request):
-        code = request.data.get("code", None)
-        token_url = f"https://kauth.kakao.com/oauth/token"
-        redirect_uri = "http://127.0.0.1:3000/social/kakao"
+        serializer = PasswordResetSerializer(data=request.data)
+        if serializer.is_valid():
+            return Response({"message": "비밀번호 재설정 이메일"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if code is None:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        response = requests.post(
-            token_url,
-            data={
-                "grant_type": "authorization_code",
-                "client_id": os.environ.get("KAKAO_API_KEY"),
-                "redirect_uri": redirect_uri,
-                "code": code,
-                "client_secret": os.environ.get("KAKAO_CLIENT_SECRET"),
-            },
-            headers={"Content-type": "application/x-www-form-urlencoded;charset=utf-8"},
-        )
-
-        access_token = response.json().get("access_token")
-        user_url = "https://kapi.kakao.com/v2/user/me"
-        response = requests.get(
-            user_url,
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Content-type": "application/x-www-form-urlencoded;charset=utf-8",
-            },
-        )
-        user_data = response.json()
-        kakao_account = user_data.get("kakao_account")
-        profile = kakao_account.get("profile")
-
-        if not kakao_account.get("is_email_valid") and not kakao_account.get(
-            "is_email_verified"
-        ):
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-        user_email = kakao_account.get("email")
-
+class PasswordTokenCheckView(APIView):
+    def get(self, request, uidb64, token):
         try:
-            user = User.objects.get(email=user_email)
-            refresh_token = CustomTokenObtainPairSerializer.get_token(user)
+            user_id = force_str(urlsafe_b64decode(uidb64))
+            user = get_object_or_404(User, id=user_id)
+            if not PasswordResetTokenGenerator().check_token(user, token):
+                return Response({"message": "링크가 유효하지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            return Response(
-                {
-                    "refresh": str(refresh_token),
-                    "access": str(refresh_token.access_token),
-                }
-            )
+            return Response({"uidb64": uidb64, "token": token}, status=status.HTTP_200_OK)
 
-        except User.DoesNotExist:
-            user = User.objects.create_user(email=user_email)
-            user.set_unusable_password()
-            user.nickname = profile.get("nickname", f"user#{user.pk}")
-            user.avatar = profile.get("thumbnail_image_url", None)
-            user.save()
-
-            refresh_token = CustomTokenObtainPairSerializer.get_token(user)
-
-            return Response(
-                {
-                    "refresh": str(refresh_token),
-                    "access": str(refresh_token.access_token),
-                }
-            )
+        except DjangoUnicodeDecodeError as identifier:
+            return Response({"message": "링크가 유효하지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-class GithubLogin(APIView):
+class NewPasswordView(APIView):
+    def put(self, request):
+        serializer = SetNewPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            return Response({"message": "비밀번호 재설정 완료"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ObtainUserTokenView(APIView):
     def post(self, request):
-        code = request.data.get("code", None)
-        token_url = "https://github.com/login/oauth/access_token"
-        redirect_uri = "http://127.0.0.1:3000/social/github"
-
-        if code is None:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-        response = requests.post(
-            token_url,
-            data={
-                "client_id": os.environ.get("GH_CLIENT_ID"),
-                "client_secret": os.environ.get("GH_CLIENT_SECRET"),
-                "code": code,
-                "redirect_uri": redirect_uri,
-            },
-            headers={
-                "Accept": "application/json",
-            },
-        )
-
-        access_token = response.json().get("access_token")
-        user_url = "https://api.github.com/user"
-        user_email_url = "https://api.github.com/user/emails"
-
-        response = requests.get(
-            user_url,
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
-            },
-        )
-
-        user_data = response.json()
-
-        response = requests.get(
-            user_email_url,
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
-            },
-        )
-
-        user_emails = response.json()
-
-        user_email = None
-
-        for email_data in user_emails:
-            if email_data.get("primary") and email_data.get("verified"):
-                user_email = email_data.get("email")
-
-        try:
-            user = User.objects.get(email=user_email)
-            refresh_token = CustomTokenObtainPairSerializer.get_token(user)
-
-            return Response(
-                {
-                    "refresh": str(refresh_token),
-                    "access": str(refresh_token.access_token),
-                }
+        serializer = TokenSerializer(
+            data=request.data, context={"request": request})
+        if serializer.is_valid():
+            user = authenticate(
+                email=serializer.validated_data["email"],
+                password=serializer.validated_data["password"],
             )
-
-        except User.DoesNotExist:
-            user = User.objects.create_user(email=user_email)
-            user.set_unusable_password()
-            user.nickname = user_data.get("login", f"user#{user.pk}")
-            user.avatar = user_data.get("avatar_url", None)
-            user.save()
-
-            refresh_token = CustomTokenObtainPairSerializer.get_token(user)
-
-            return Response(
-                {
-                    "refresh": str(refresh_token),
-                    "access": str(refresh_token.access_token),
-                }
-            )
+            token, _ = Token.objects.get_or_create(user=user)
+            return Response({"token": token.key}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
