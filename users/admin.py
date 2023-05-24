@@ -15,12 +15,7 @@ class UserCreationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = [
-            "email",
-            "nickname",
-            "avatar",
-            "intro",
-        ]
+        fields = ["email"]
 
     def clean_password2(self):
         password1 = self.cleaned_data.get("password1")
@@ -42,72 +37,31 @@ class UserChangeForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = [
-            "email",
-            "password",
-            "is_active",
-            "is_admin",
-            "nickname",
-            "avatar",
-            "intro",
-        ]
+        fields = ["email", "password", "is_active", "is_admin"]
 
 
 class UserAdmin(BaseUserAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
 
-    list_display = ["email", "nickname", "is_admin"]
+    list_display = ["id", "email", "name", "is_admin", "is_active"]
     list_filter = ["is_admin"]
     fieldsets = [
-        (
-            None,
-            {
-                "fields": (
-                    "email",
-                    "password",
-                )
-            },
-        ),
-        (
-            "Personal info",
-            {
-                "fields": (
-                    "nickname",
-                    "intro",
-                    "avatar",
-                )
-            },
-        ),
-        (
-            "Permissions",
-            {
-                "fields": (
-                    "is_admin",
-                    "is_active",
-                )
-            },
-        ),
+        (None, {"fields": ["email", "password", "followings"]}),
+        ("Permissions", {"fields": ["is_admin", "is_active"]}),
     ]
     add_fieldsets = [
         (
             None,
             {
-                "classes": ("wide",),
-                "fields": (
-                    "email",
-                    "password1",
-                    "password2",
-                    "nickname",
-                    "intro",
-                    "avatar",
-                ),
+                "classes": ["wide",],
+                "fields": ["email", "password1", "password2"],
             },
         ),
     ]
-    search_fields = ("email",)
-    ordering = ("email",)
-    filter_horizontal = ()
+    search_fields = ["email",]
+    ordering = ["email"]
+    filter_horizontal = []
 
 
 admin.site.register(User, UserAdmin)
