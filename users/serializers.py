@@ -64,7 +64,7 @@ class UserSerializer(serializers.ModelSerializer):
         return serializer.data
 
     def get_article(self, obj):
-        article = obj.reviews.order_by("-created_at")
+        article = obj.articles.order_by("-created_at")
         serializer = MyArticleSerializer(article, many=True)
         return serializer.data
 
@@ -85,10 +85,10 @@ class UserSerializer(serializers.ModelSerializer):
         cur_password = validated_data.pop("password1", None)
         new_password = validated_data.pop("password2", None)
 
-        if not all(cur_password, new_password):
+        if not all([cur_password, new_password]):
             return ParseError
 
-        if not user.check_password(cur_password):
+        if not instance.check_password(cur_password):
             raise NotAuthenticated
 
         user = super().update(instance, validated_data)
