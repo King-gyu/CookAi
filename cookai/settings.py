@@ -133,7 +133,8 @@ SIMPLE_JWT = {
 
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
-    "VERIFYING_KEY": "",
+    # "VERIFYING_KEY": "",
+    "VERIFYING_KEY": None,
     "AUDIENCE": None,
     "ISSUER": None,
     "JSON_ENCODER": None,
@@ -167,10 +168,10 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = True
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = "smtp.gmail.com"
+EMAIL_USE_TLS = True 
 EMAIL_PORT = 587
-
+EMAIL_HOST = "smtp.gmail.com"
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD =  os.environ.get("EMAIL_HOST_PASSWORD")
-EMAIL_USE_TLS = True 
+
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER 

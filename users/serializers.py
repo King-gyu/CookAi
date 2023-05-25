@@ -3,6 +3,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from users.models import User
+from articles.models import Article
 from articles.serializers import ArticleSerializer
 
 from base64 import urlsafe_b64encode
@@ -18,144 +19,172 @@ import threading
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        exclude = ["followings",]
+        fields = "__all__"
+    #     exclude = ["followings",]
 
     def create(self, validated_data):
+        user = super().create(validated_data)
+        password = user.password
+        # 비밀번호 암호화
+        user.set_password(password)
+        user.save()
+        return user
+
+    # def update(self, instance, validated_data):
+    #     user = super().update(instance, validated_data)
+    def update(self, validated_data):
         user = super().create(validated_data)
         password = user.password
         user.set_password(password)
         user.save()
         return user
-
-    def update(self, instance, validated_data):
-        user = super().update(instance, validated_data)
-        password = user.password
-        user.set_password(password)
-        user.save()
-        return user
     
-class UserProfileSerializer(serializers.ModelSerializer):
-    followings = serializers.StringRelatedField(many=True)
-    followers = serializers.StringRelatedField(many=True)
+# class UserProfileSerializer(serializers.ModelSerializer):
+#     # followings = serializers.StringRelatedField(many=True)
+#     # followers = serializers.StringRelatedField(many=True)
     
-    class Meta:
-        model = User
-        fields = ("email", "name", "followings", "followers")
+#     class Meta:
+#         model = User
+#         fields = ("email", "name") #, "followings", "followers"
 
-class EmailThread(threading.Thread):
-    def __init__(self, email):
-        self.email = email
-        threading.Thread.__init__(self)
+# class EmailThread(threading.Thread):
+#     def __init__(self, email):
+#         self.email = email
+#         threading.Thread.__init__(self)
 
-    def run(self):
-        self.email.send()
+#     def run(self):
+#         self.email.send()
 
-class Util:
-    @staticmethod
-    def send_email(message):
-        email = EmailMessage(subject=message["email_subject"], 
-                             body=message["email_body"], 
-                             to=[message["to_email"]])
-        EmailThread(email).start()
-
-
-class PasswordResetSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-
-    class Meta:
-        fields = ("email",)
-
-    def validate(self, attrs):
-        try:
-            email = attrs.get("email")
-
-            user = User.objects.get(email=email)
-            uidb64 = urlsafe_b64encode(smart_bytes(user.id))
-            token = PasswordResetTokenGenerator().make_token(user)
-
-            frontend_site = "http://127.0.0.1:8000"
-            #frontend_site = "127.0.0.1:5500"
-            absurl = f"http://{frontend_site}/set_password.html?id=${uidb64}&token=${token}"
-
-            email_body = "비밀번호 재설정 \n " + absurl
-            message = {
-                "email_body": email_body,
-                "to_email": user.email,
-                "email_subject": "비밀번호 재설정",
-            }
-            Util.send_email(message)
-
-            return super().validate(attrs)
-
-        except User.DoesNotExist:
-            raise serializers.ValidationError(
-                detail={"email": "잘못된 이메일입니다. 다시 입력해주세요."})
+# class Util:
+#     @staticmethod
+#     def send_email(message):
+#         email = EmailMessage(subject=message["email_subject"], 
+#                              body=message["email_body"], 
+#                              to=[message["to_email"]])
+#         EmailThread(email).start()
 
 
-class SetNewPasswordSerializer(serializers.Serializer):
-    password = serializers.CharField(
-        write_only=True,
-    )
-    repassword = serializers.CharField(
-        write_only=True,
-    )
-    token = serializers.CharField(
-        max_length=100,
-        write_only=True,
-    )
-    uidb64 = serializers.CharField(
-        max_length=100,
-        write_only=True,
-    )
+# class PasswordResetSerializer(serializers.Serializer):
+#     email = serializers.EmailField()
 
-    class Meta:
-        fields = (
-            "repassword",
-            "password",
-            "token",
-            "uidb64",
-        )
+#     class Meta:
+#         fields = ("email",)
 
-    def validate(self, attrs):
-        password = attrs.get("password")
-        repassword = attrs.get("repassword")
-        token = attrs.get("token")
-        uidb64 = attrs.get("uidb64")
+#     def validate(self, attrs):
+#         try:
+#             email = attrs.get("email")
 
-        try:
-            user_id = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(id=user_id)
+#             user = User.objects.get(email=email)
+#             uidb64 = urlsafe_b64encode(smart_bytes(user.id))
+#             token = PasswordResetTokenGenerator().make_token(user)
 
-            if PasswordResetTokenGenerator().check_token(user, token) == False:
-                raise exceptions.AuthenticationFailed("토큰이 유효하지 않습니다.", 401)
-            if password != repassword:
-                raise serializers.ValidationError(
-                    detail={"repassword": "비밀번호가 일치하지 않습니다."})
+#             frontend_site = "http://127.0.0.1:8000"
+#             #frontend_site = "127.0.0.1:5500"
+#             absurl = f"http://{frontend_site}/set_password.html?id=${uidb64}&token=${token}"
 
-            user.set_password(password)
-            user.save()
+#             email_body = "비밀번호 재설정 \n " + absurl
+#             message = {
+#                 "email_body": email_body,
+#                 "to_email": user.email,
+#                 "email_subject": "비밀번호 재설정",
+#             }
+#             Util.send_email(message)
 
-            return super().validate(attrs)
+#             return super().validate(attrs)
 
-        except User.DoesNotExist:
-            raise serializers.ValidationError(
-                detail={"user": "존재하지 않는 회원입니다."})
+#         except User.DoesNotExist:
+#             raise serializers.ValidationError(
+#                 detail={"email": "잘못된 이메일입니다. 다시 입력해주세요."})
 
 
-class TokenSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(
-        write_only=True,
-    )
+# class SetNewPasswordSerializer(serializers.Serializer):
+#     password = serializers.CharField(
+#         write_only=True,
+#     )
+#     repassword = serializers.CharField(
+#         write_only=True,
+#     )
+#     token = serializers.CharField(
+#         max_length=100,
+#         write_only=True,
+#     )
+#     uidb64 = serializers.CharField(
+#         max_length=100,
+#         write_only=True,
+#     )
 
-class PasswordVerificationSerializer(serializers.Serializer):
-    password = serializers.CharField(max_length=128)
+#     class Meta:
+#         fields = (
+#             "repassword",
+#             "password",
+#             "token",
+#             "uidb64",
+#         )
+
+#     def validate(self, attrs):
+#         password = attrs.get("password")
+#         repassword = attrs.get("repassword")
+#         token = attrs.get("token")
+#         uidb64 = attrs.get("uidb64")
+
+#         try:
+#             user_id = force_str(urlsafe_base64_decode(uidb64))
+#             user = User.objects.get(id=user_id)
+
+#             if PasswordResetTokenGenerator().check_token(user, token) == False:
+#                 raise exceptions.AuthenticationFailed("토큰이 유효하지 않습니다.", 401)
+#             if password != repassword:
+#                 raise serializers.ValidationError(
+#                     detail={"repassword": "비밀번호가 일치하지 않습니다."})
+
+#             user.set_password(password)
+#             user.save()
+
+#             return super().validate(attrs)
+
+#         except User.DoesNotExist:
+#             raise serializers.ValidationError(
+#                 detail={"user": "존재하지 않는 회원입니다."})
 
 
+# class TokenSerializer(serializers.Serializer):
+#     email = serializers.EmailField()
+#     password = serializers.CharField(
+#         write_only=True,
+#     )
+
+# class PasswordVerificationSerializer(serializers.Serializer):
+#     password = serializers.CharField(max_length=128)
+
+# 토큰에 id,email,name 추가함
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
+        token["id"] = user.id
         token["email"] = user.email
         token["name"] = user.name
+
         return token
+
+# 마이페이지    
+class MyPageSerializer(serializers.ModelSerializer):
+    articles = serializers.SerializerMethodField()
+    
+    def get_articles(self, obj):
+        request = self.context.get('request')
+        if request and request.user:
+            user = request.user
+            # 사용자가 작성한 게시글을 필터링
+            articles = Article.objects.filter(author=user)
+            
+            if articles.exists():
+                # 해당 게시글을 직렬화
+                serializer = ArticleSerializer(articles, many=True)
+                return serializer.data
+        return {'message': '작성한 글이 없습니다.'}
+
+    class Meta:
+        model=User
+        # fields = '__all__'
+        fields = ('id','name','email', 'articles')
