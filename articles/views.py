@@ -2,9 +2,63 @@ from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404
-from articles.models import Article, Comment
-from articles.serializers import ArticleSerializer, ArticleCreateSerializer, ArticleListSerializer, CommentSerializer, CommentCreateSerializer
+from articles.models import Article, Comment, Tag
+from articles.serializers import ArticleSerializer, ArticleCreateSerializer, ArticleListSerializer, CommentSerializer, CommentCreateSerializer, TagSerializer
 
+class TagView(APIView):
+    def get(self, request):
+        tags = Tag.objects.all()
+        serializer = TagSerializer(tags, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        serializer = TagSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.erros, status=status.HTTP_400_BAD_REQUEST)
+        
+class TagDetailView(APIView):
+    def get_object(self, pk):
+        try:
+            return Tag.objects.get(pk=pk)
+        except Tag.DoesNotExist:
+            return None
+
+    def get(self, request, tag_pk):
+        tag = self.get_object(tag_pk)
+        if tag is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        serializer = TagSerializer(tag)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, tag_pk):
+        tag = self.get_object(tag_pk)
+        if tag is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        serializer = TagSerializer(tag, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, tag_pk):
+        tag = self.get_object(tag_pk)
+        if tag is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        tag.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class TagCreateView(APIView):
+    def post(self, request):
+        serializer = TagSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.erros, status=status.HTTP_400_BAD_REQUEST)
 
 class ArticleView(APIView):
     def get(self, request):
@@ -29,7 +83,7 @@ class ArticleDetailView(APIView):
 
     def put(self, request, article_pk):
         article = get_object_or_404(Article, pk=article_pk)
-        if request.author == article.author:
+        if request.user == article.user:
             serializer = ArticleCreateSerializer(article, data=request.data)
             if serializer.is_valid():
                 serializer.save()
@@ -41,7 +95,7 @@ class ArticleDetailView(APIView):
 
     def delete(self, request, article_pk):
         article = get_object_or_404(Article, pk=article_pk)
-        if request.author == article.author:
+        if request.user == article.user:
             article.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
@@ -58,7 +112,7 @@ class CommentView(APIView):
     def post(self, request, article_pk):
         serializer = CommentCreateSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(author=request.author, article_pk=article_pk)
+            serializer.save(user=request.user, article_pk=article_pk)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -72,7 +126,7 @@ class CommentDetailView(APIView):
 
     def put(self, request, article_pk, comment_pk):
         comment = get_object_or_404(Comment, pk=comment_pk)
-        if request.author == comment.author:
+        if request.user == comment.user:
             serializer = CommentCreateSerializer(comment, data=request.data)
             if serializer.is_valid():
                 serializer.save()
@@ -84,7 +138,7 @@ class CommentDetailView(APIView):
 
     def delete(self, request, article_pk, comment_pk):
         comment = get_object_or_404(Comment, pk=comment_pk)
-        if request.author == comment.author:
+        if request.user == comment.user:
             comment.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
@@ -94,10 +148,10 @@ class CommentDetailView(APIView):
 class LikeView(APIView):
     def post(self, request, article_pk):
         article = get_object_or_404(Article, pk=article_pk)
-        if request.author in article.likes.all():
-            article.likes.remove(request.author)
+        if request.user in article.likes.all():
+            article.likes.remove(request.user)
             return Response("좋아요 취소", status=status.HTTP_200_OK)
         else:
-            article.likes.add(request.author)
+            article.likes.add(request.user)
             return Response("좋아요", status=status.HTTP_200_OK)
         

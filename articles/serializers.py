@@ -1,10 +1,16 @@
 # 게시글 작성, 수정, 삭제, 조회를 위한 serializer
 
 from rest_framework import serializers
-from articles.models import Article, Comment
+from articles.models import Article, Comment, Tag
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = '__all__'
 
 class ArticleSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True)
 
     def get_user(self, obj):
         return obj.user.email
