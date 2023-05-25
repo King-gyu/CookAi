@@ -4,26 +4,29 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from users import views
+from django.urls import path
+app_name = 'users'
 
 urlpatterns = [
-    path("signup/", views.SignupView.as_view(), name="signup"),
-    path("mock/", views.mockView.as_view(), name="mock"),
-    # path("verify-email/b'<str:uidb64>'/<str:token>/", views.VerifyEmailView.as_view(), name='verify-email'),
-    # path("login/", views.ProfileView.as_view(), name='login'),
-    path("<int:user_id>/",views.MyPageView.as_view(),name='mypage'),
+    #회원가입
+    path("signup/", views.UserSignupView.as_view(), name="signup"),
 
-    path("api/token", views.CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path("api/token/refresh/", TokenRefreshView.as_view(), name='token_refresh'),
-    
-    # path("logout/", views.UserLogoutView.as_view(), name="logout"),
+    #이메일인증
+    path("activate/<slug:uidb64>/<slug:token>/", views.UserActivate.as_view(), name="activate"),
+    path("success/", views.active_success, name="success"),
 
-    # path("<int:user_id>/detail/", views.ProfileView.as_view(), name="user_detail"),
-    # path("<int:user_id>/update/", views.ProfileView.as_view(), name='user_update'),
-    # path("<int:user_id>/delete/", views.UserDeleteView.as_view(), name='user_delete'),
-    # path("<int:user_id>/follow/", views.FollowView.as_view(), name="follow_view"),
-    
-    # path("password/find/", views.PasswordResetView.as_view(), name='password_reset'),
-    # path("password/change/", views.NewPasswordView.as_view(), name="pw_change"), 
-    # path("password/change/b'<str:uidb64>'/<str:token>/", views.PasswordTokenCheckView.as_view(), name="pw_change_confirm"),
-    # path("password/change/confirm/", views.NewPasswordView.as_view(), name="pw_change_confirm"), 
+    #로그인
+    path("login/", views.CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    #토큰 재발행
+    path("login/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
+    # 로그아웃
+    path("logout/", views.UserLogoutView.as_view(), name='logout'),
+
+    # 마이페이지
+    path('mypage/<int:user_id>/', views.MyPageView.as_view(), name="mypage"),
+
+    #팔로우
+    path('follow/<int:user_id>/', views.FollowView.as_view(), name='follow_view'),
+
 ]
