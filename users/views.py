@@ -3,7 +3,6 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.contrib.auth import authenticate
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import DjangoUnicodeDecodeError, force_str, force_bytes
-from django.db.models.query_utils import Q
 from django.shortcuts import redirect
 from django.core.mail import EmailMessage
 
@@ -13,8 +12,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework.generics import CreateAPIView
-from rest_framework.parsers import MultiPartParser, FormParser
 
 from users.serializers import UserSerializer, CustomTokenObtainPairSerializer, UserProfileSerializer
 from .serializers import PasswordResetSerializer, SetNewPasswordSerializer, TokenSerializer, EmailThread, PasswordVerificationSerializer
@@ -96,6 +93,15 @@ class ProfileView(APIView):
                 return Response({"message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"message": "권한이 없습니다!"}, status=status.HTTP_403_FORBIDDEN)
+
+
+class UserLogoutView(APIView):
+    def post(self, request):
+        response = Response({"message": "로그아웃 완료"}, status=status.HTTP_200_OK)
+        response.delete_cookie("access")
+        response.delete_cookie("refresh")
+        return response
+    
 
 class UserDeleteView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
