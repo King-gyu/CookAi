@@ -12,6 +12,8 @@ import traceback
 from django.shortcuts import redirect, render
 from .models import User
 
+from django.core.mail import send_mail
+
 #회원가입
 class UserSignupView(APIView):
     def post(self, request):
