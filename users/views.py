@@ -1,10 +1,10 @@
-from rest_framework import status
+from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
-from users.serializers import UserSerializer, UserProfileSerializer, MyTokenObtainPairSerializer
+from users.serializers import UserSerializer, MyPageSerializer, MyTokenObtainPairSerializer
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
 from users.tokens import account_activation_token
@@ -43,14 +43,18 @@ class FollowView(APIView):
             else:
                 return Response("자신을 팔로우 할 수 없습니다.", status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response("로그인이 필요합니다.", status=status.HTTP_403_FORBIDDEN)
+            return Response({'mesage': '권한이 없습니다!'}, status=status.HTTP_403_FORBIDDEN)
 
 #회원정보
-class UserProfileView(APIView):
+class MyPageView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def get(self, request, user_id):
         user = get_object_or_404(User, pk=user_id)
-        serializer = UserProfileSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        if request.user == user:
+            serializer = MyPageSerializer(user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({'mesage': '권한이 없습니다.'}, status=status.HTTP_403_FORBIDDEN)
 
 #회원정보 수정
     def put(self, request, user_id):

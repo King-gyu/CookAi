@@ -1,5 +1,8 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 from users import views
 from django.urls import path
 app_name = 'users'
@@ -20,8 +23,8 @@ urlpatterns = [
     # 로그아웃
     path("logout/", views.UserLogoutView.as_view(), name='logout'),
 
-    #유저 프로필
-    path('profile/<int:user_id>/', views.UserProfileView.as_view(), name="user_profile"),
+    # 마이페이지
+    path('mypage/<int:user_id>/', views.MyPageView.as_view(), name="mypage"),
 
     #팔로우
     path('follow/<int:user_id>/', views.FollowView.as_view(), name='follow_view'),

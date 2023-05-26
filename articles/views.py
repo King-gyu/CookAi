@@ -1,12 +1,12 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
+from articles.models import Article, Comment, Tag, ImagesUp
+from articles.serializers import ImagesSerializer, ArticleSerializer, ArticleCreateSerializer, ArticleListSerializer, CommentSerializer, CommentCreateSerializer, TagSerializer
 from rest_framework import status
-from .models import Article, Comment, ImagesUp
-from .serializers import ArticleSerializer, CommentSerializer, ImagesSerializer
 from pathlib import Path
-# from api_key import get_secret
 import torch
 import requests
 import json
@@ -77,246 +77,160 @@ class CookaiView(APIView):
         except Exception as e :
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(data = data, status=status.HTTP_200_OK)
-
-        
-# 게시글 작성
-
-class ArticleCreateView(APIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializer
-    
-    @login_required(login_url='')
-    def post(self, request, *args, **kwargs):
-        return render(request, 'articles/article_create.html')
-
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-    
-# 게시글 수정
-class ArticleUpdateView(APIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializer
-    
-    @login_required(login_url='')
-    def put(self, request, *args, **kwargs):
-        article = self.get_object()
-        if article.author == request.user:
-            return self.update(request, *args, **kwargs)
+class TagView(APIView):
+    def get(self, request):
+        tags = Tag.objects.all()
+        serializer = TagSerializer(tags, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    def post(self, request):
+        serializer = TagSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
-            return Response(status=403)
+            return Response(serializer.erros, status=status.HTTP_400_BAD_REQUEST)
         
-    def patch(self, request, *args, **kwargs):
-        article = self.get_object()
-        if article.author == request.user:
-            return self.partial_update(request, *args, **kwargs)
-        else:
-            return Response(status=403)
-        
-    def perform_update(self, serializer):
-        serializer.save(author=self.request.user)
+class TagDetailView(APIView):
+    def get_object(self, pk):
+        try:
+            return Tag.objects.get(pk=pk)
+        except Tag.DoesNotExist:
+            return None
 
-# 게시글 삭제
-class ArticleDeleteView(APIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializer
+    def get(self, request, tag_pk):
+        tag = self.get_object(tag_pk)
+        if tag is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        serializer = TagSerializer(tag)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, tag_pk):
+        tag = self.get_object(tag_pk)
+        if tag is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        serializer = TagSerializer(tag, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, tag_pk):
+        tag = self.get_object(tag_pk)
+        if tag is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        tag.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
-    @login_required(login_url='')
-    def delete(self, request, *args, **kwargs):
-        article = self.get_object()
-        if article.author == request.user:
-            article.delete()
-            return Response(status=204)
+class TagCreateView(APIView):
+    def post(self, request):
+        serializer = TagSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
-            return Response(status=403)
-        
-    def perform_destroy(self, instance):
-        instance.delete()
+            return Response(serializer.erros, status=status.HTTP_400_BAD_REQUEST)
 
-# 게시글 상세조회
+class ArticleView(APIView):
+    permission_classes = (IsAuthenticated,)
+    
+    def get(self, request):
+        articles = Article.objects.all()
+        serializer = ArticleListSerializer(articles, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def get_serializer_context(self):
+        context = {'request': self.request}
+        if hasattr(self, 'request'):
+            context.update({'request': self.request})
+        return context
+
+    def post(self, request):
+        serializer = ArticleCreateSerializer(data=request.data, context=self.get_serializer_context())
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class ArticleDetailView(APIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializer
-    
-    def get(self, request, *args, **kwargs):
-        article = self.get_object()
-        serializer = self.get_serializer(article)
-        return Response(serializer.data)
-    
-    def retrieve(self, request, *args, **kwargs):
-        article = self.get_object()
-        serializer = self.get_serializer(article)
-        return Response(serializer.data)
-    
-    def get_object(self):
-        queryset = self.filter_queryset(self.get_queryset())
-        obj = get_object_or_404(queryset, pk=self.kwargs['pk'])
-        self.check_object_permissions(self.request, obj)
-        return obj
+    def get(self, request, article_pk):
+        article = get_object_or_404(Article, pk=article_pk)
+        serializer = ArticleSerializer(article)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-# 게시글 목록조회
-class ArticleListView(APIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializer
-    
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
-    
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
-    def get_queryset(self):
-        queryset = Article.objects.all()
-        return queryset
-
-# 댓글 작성
-class CommentCreateView(APIView):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    
-    @login_required(login_url='')
-    def post(self, request, *args, **kwargs):
-        return self.create(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        article = get_object_or_404(Article, pk=self.kwargs['pk'])
-        serializer.save(author=self.request.user, article=article)
-
-# 댓글 수정
-class CommentUpdateView(APIView):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    
-    @login_required(login_url='')
-    def put(self, request, *args, **kwargs):
-        comment = self.get_object()
-        if comment.author == request.user:
-            return self.update(request, *args, **kwargs)
+    def put(self, request, article_pk):
+        article = get_object_or_404(Article, pk=article_pk)
+        if request.user == article.user:
+            serializer = ArticleCreateSerializer(article, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response(status=403)
-        
-    def patch(self, request, *args, **kwargs):
-        comment = self.get_object()
-        if comment.author == request.user:
-            return self.partial_update(request, *args, **kwargs)
-        else:
-            return Response(status=403)
-        
-    def perform_update(self, serializer):
-        serializer.save(author=self.request.user)
+            return Response("권한이 없습니다.", status=status.HTTP_403_FORBIDDEN)
 
-# 댓글 삭제
-class CommentDeleteView(APIView):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    
-    @login_required(login_url='')
-    def delete(self, request, *args, **kwargs):
-        comment = self.get_object()
-        if comment.author == request.user:
-            comment.delete()
-            return Response(status=204)
+    def delete(self, request, article_pk):
+        article = get_object_or_404(Article, pk=article_pk)
+        if request.user == article.user:
+            article.delete()
+            return Response("삭제되었습니다.", status=status.HTTP_204_NO_CONTENT)
         else:
-            return Response(status=403)
-        
-    def perform_destroy(self, instance):
-        instance.delete()
+            return Response("권한이 없습니다.", status=status.HTTP_403_FORBIDDEN)
 
-# 댓글 상세조회
+
+class CommentView(APIView):
+    def get(self, request, article_pk):
+        article = Article.objects.get(pk=article_pk)
+        comments = article.comment_set.all()
+        serializer = CommentSerializer(comments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, article_pk):
+        serializer = CommentCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user, article_pk=article_pk)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class CommentDetailView(APIView):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    
-    def get(self, request, *args, **kwargs):
-        comment = self.get_object()
-        serializer = self.get_serializer(comment)
+    def get(self, request, article_pk, comment_pk):
+        comment = Comment.objects.get(pk=comment_pk)
+        serializer = CommentSerializer(comment)
         return Response(serializer.data)
-    
-    def retrieve(self, request, *args, **kwargs):
-        comment = self.get_object()
-        serializer = self.get_serializer(comment)
-        return Response(serializer.data)
-    
-    def get_object(self):
-        queryset = self.filter_queryset(self.get_queryset())
-        obj = get_object_or_404(queryset, pk=self.kwargs['pk'])
-        self.check_object_permissions(self.request, obj)
-        return obj
 
-# 댓글 목록조회
-class CommentListView(APIView):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
-    
-    def list(self, request, *args, **kwargs):
-        article = get_object_or_404(Article, pk=self.kwargs['pk'])
-        queryset = self.filter_queryset(article.comment_set.all())
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
-    def get_queryset(self):
-        article = get_object_or_404(Article, pk=self.kwargs['pk'])
-        queryset = article.comment_set.all()
-        return queryset
-
-# 게시글 좋아요
-class ArticleLikeView(APIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializer
-    
-    @login_required(login_url='')
-    def post(self, request, *args, **kwargs):
-        article = self.get_object()
-        if article.like_users.filter(pk=request.user.pk).exists():
-            article.like_users.remove(request.user)
+    def put(self, request, article_pk, comment_pk):
+        comment = get_object_or_404(Comment, pk=comment_pk)
+        if request.user == comment.user:
+            serializer = CommentCreateSerializer(comment, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         else:
-            article.like_users.add(request.user)
-        serializer = self.get_serializer(article)
-        return Response(serializer.data)
-    
-    def get_object(self):
-        queryset = self.filter_queryset(self.get_queryset())
-        obj = get_object_or_404(queryset, pk=self.kwargs['pk'])
-        self.check_object_permissions(self.request, obj)
-        return obj
+            return Response("권한이 없습니다.", status=status.HTTP_403_FORBIDDEN)
 
-# 댓글 좋아요
-class CommentLikeView(APIView):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    
-    @login_required(login_url='')
-    def post(self, request, *args, **kwargs):
-        comment = self.get_object()
-        if comment.like_users.filter(pk=request.user.pk).exists():
-            comment.like_users.remove(request.user)
+    def delete(self, request, article_pk, comment_pk):
+        comment = get_object_or_404(Comment, pk=comment_pk)
+        if request.user == comment.user:
+            comment.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         else:
-            comment.like_users.add(request.user)
-        serializer = self.get_serializer(comment)
-        return Response(serializer.data)
-    
-    def get_object(self):
-        queryset = self.filter_queryset(self.get_queryset())
-        obj = get_object_or_404(queryset, pk=self.kwargs['pk'])
-        self.check_object_permissions(self.request, obj)
-        return obj
+            return Response("권한이 없습니다.", status=status.HTTP_403_FORBIDDEN)
 
-# 게시글 신고
 
-# 댓글 신고
-
-# 게시글 검색
-
-# 댓글 검색
-
-# 게시글 필터
-
-# 댓글 필터
-
-# 게시글 정렬
-
-# 댓글 정렬
+class LikeView(APIView):
+    def post(self, request, article_pk):
+        article = get_object_or_404(Article, pk=article_pk)
+        if request.user in article.likes.all():
+            article.likes.remove(request.user)
+            return Response("좋아요 취소", status=status.HTTP_200_OK)
+        else:
+            article.likes.add(request.user)
+            return Response("좋아요", status=status.HTTP_200_OK)
+        
