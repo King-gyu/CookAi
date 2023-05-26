@@ -25,7 +25,7 @@ class Article(models.Model):
 # 댓글 모델 (작성자, 내용, 이미지, 작성일, 수정일, 좋아요)
 class Comment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='comment_set')
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='comments')
     content = models.TextField()
     image = models.ImageField(upload_to='comment/%Y/%m/', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
