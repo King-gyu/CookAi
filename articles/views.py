@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from articles.models import Article, Comment, Tag
 from articles.serializers import ArticleSerializer, ArticleCreateSerializer, ArticleListSerializer, CommentSerializer, CommentCreateSerializer, TagSerializer
 
@@ -74,6 +74,11 @@ class ArticleView(APIView):
         if hasattr(self, 'request'):
             context.update({'request': self.request})
         return context
+    
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated()]
+        return [AllowAny()]
 
     def post(self, request):
         serializer = ArticleCreateSerializer(data=request.data, context=self.get_serializer_context())
