@@ -466,4 +466,8 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+secret.json
+api_key.json
+test.py
+
 # End of https://www.toptal.com/developers/gitignore/api/windows,python,macos,django,visualstudiocode,pycharm,venv

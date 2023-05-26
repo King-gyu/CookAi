@@ -23,3 +23,7 @@ class Comment(models.Model):
 
     def __str__(self):
         return f'<Article({self.article_id}): Comment({self.pk})-{self.content}>'
+    
+class ImagesUp(models.Model):
+    user = "jychoi1996@gmail.com"
+    imgfile = models.ImageField(null=True, upload_to="", blank=True) # 이거 고쳐야함

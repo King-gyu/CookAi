@@ -2,10 +2,85 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Article, Comment
-from .serializers import ArticleSerializer, CommentSerializer
+from rest_framework import status
+from .models import Article, Comment, ImagesUp
+from .serializers import ArticleSerializer, CommentSerializer, ImagesSerializer
+from pathlib import Path
+# from api_key import get_secret
+import torch
+import requests
+import json
+import os
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+secret_file = os.path.join(BASE_DIR,'api_key.json')
+
+with open(secret_file) as f:
+    secrets = json.loads(f.read())
+
+
+def get_secret(setting, secrets=secrets):
+    try:
+        return secrets[setting]
+    except KeyError:
+        error_msg = "Set the {} environment variable".format(setting)
+        raise error_msg
+
+
+class CookaiView(APIView):
+    # @login_required(login_url='')
+    def post(self, request):
+        '''cookai 이미지 판별 ai'''
+        # cookai-1 의 이미지 판별함
+        myimage = ImagesSerializer(data=request.data)
+        if myimage.is_valid():
+            myimage.save()      # 이미지 저장
+        
+        print(request.data['imgfile'])
+        img = ImagesUp.objects.get(imgfile=request.data['imgfile'])
+        # img = ImagesUp.objects.get(imgfile='KakaoTalk_20230407_165736763.jpg')
+        
+        
+        #  Model
+        model = torch.hub.load('ultralytics/yolov5', 'custom',
+                            'C:/Users/shqk1/Desktop/sp/a8/CookAi/articles/weights/best.pt')  # custom trained model
+
+        
+        im = img.imgfile.path
+
+        # Inference
+        results = model(im)
+        img.imgfile.storage.delete(img.imgfile.path)
+        img.delete()
+        df = results.pandas().xyxy[0].head(1)  # im predictions (pandas)
+        try :
+            max_cof = max(df['confidence'])# confidence
+            
+            
+            if max_cof < 0.85:
+                return Response({"메시지": "not found"},status=status.HTTP_200_OK)
+            
+            # # 결과값
+            result = str(*df['name'].values)
+            
+            sample_dict = {
+                'egg' : '계란',
+                'tofu' : '두부',
+            }
+            
+            api_key = get_secret('API_KEY')
+            igd = sample_dict[result]
+            print(igd)
+
+            response = requests.get(f'https://openapi.foodsafetykorea.go.kr/api/{api_key}/COOKRCP01/json/1/9/RCP_NM={igd}')
+            data = json.loads(response.text)
+        except Exception as e :
+            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data = data, status=status.HTTP_200_OK)
+
+        
 # 게시글 작성
+
 class ArticleCreateView(APIView):
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer

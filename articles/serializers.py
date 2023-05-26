@@ -1,7 +1,7 @@
 # 게시글 작성, 수정, 삭제, 조회를 위한 serializer
 
 from rest_framework import serializers
-from .models import Article, Comment
+from .models import Article, Comment,ImagesUp
 
 class ArticleSerializer(serializers.ModelSerializer):
     author = serializers.ReadOnlyField(source='author.username')
@@ -15,3 +15,9 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = '__all__'
+        
+class ImagesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImagesUp
+        fields = '__all__'
+        
