@@ -13,6 +13,7 @@ urlpatterns = [
     
     path('<int:article_pk>/comment/', views.CommentView.as_view(), name='comment_view'),
     path('<int:article_pk>/comment/<int:comment_pk>/', views.CommentDetailView.as_view(), name='comment_detail_view'),
-    
+
     path('<int:article_pk>/like/', views.LikeView.as_view(), name='like_view'),
+    path('cookai/', views.CookaiView.as_view(), name='cookai-1'),
 ]

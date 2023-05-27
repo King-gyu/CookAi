@@ -1,6 +1,6 @@
 from django.db import models
 from rest_framework import serializers
-from articles.models import Article, Comment, Tag
+from articles.models import Article, Comment, Tag ,ImagesUp
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -73,3 +73,9 @@ class CommentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ('content', 'image')
+        
+class ImagesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImagesUp
+        fields = '__all__'
+        

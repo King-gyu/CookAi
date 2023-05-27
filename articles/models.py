@@ -34,4 +34,7 @@ class Comment(models.Model):
     
     def __str__(self):
         return self.content
+
     
+class ImagesUp(models.Model):
+    imgfile = models.ImageField(null=True, upload_to="", blank=True)
