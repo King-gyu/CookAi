@@ -65,28 +65,44 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["id"] = user.id
         token["email"] = user.email
         token["username"] = user.username
+        token["is_active"] = user.is_active
 
         return token
 
 # 마이페이지    
-class MyPageSerializer(serializers.ModelSerializer):
-    articles = serializers.SerializerMethodField()
+# class MyPageSerializer(serializers.ModelSerializer):
+#     articles = serializers.SerializerMethodField()
     
-    def get_articles(self, obj):
-        request = self.context.get('request')
-        if request and request.user:
-            user = request.user
-            # 사용자가 작성한 게시글을 필터링
-            articles = Article.objects.filter(author=user)
+#     def get_articles(self, obj):
+#         request = self.context.get('request')
+#         if request and request.user:
+#             user = request.user
+#             # 사용자가 작성한 게시글을 필터링
+#             articles = Article.objects.filter(author=user)
             
-            if articles.exists():
-                # 해당 게시글을 직렬화
-                serializer = ArticleSerializer(articles, many=True)
-                return serializer.data
-        return {'message': '작성한 글이 없습니다.'}
+#             if articles.exists():
+#                 # 해당 게시글을 직렬화
+#                 serializer = ArticleSerializer(articles, many=True)
+#                 return serializer.data
+#         return {'message': '작성한 글이 없습니다.'}
     
 
+#     class Meta:
+#         model=User
+#         # fields = '__all__'
+#         fields = ('id','username','email', 'profile_image', 'articles')
+
+# 마이페이지  
+# 게시글  
+class MyPageSerializer(serializers.ModelSerializer):
     class Meta:
-        model=User
-        # fields = '__all__'
-        fields = ('id','username','email', 'profile_image', 'articles')
+        model = Article
+        fields = '__all__'
+
+# 회원정보
+class UserProfileSerializer(serializers.ModelSerializer):
+    followers = UserSerializer(many=True)
+
+    class Meta:
+        model = User
+        fields = '__all__'

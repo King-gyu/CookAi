@@ -25,6 +25,8 @@ urlpatterns = [
 
     # 마이페이지
     path('mypage/<int:user_id>/', views.MyPageView.as_view(), name="mypage"),
+    path('mypage/<int:user_id>/', views.FollowView.as_view(), name="mypage"),
+    path('profile/<int:user_id>/', views.UserProfileView.as_view(), name="profile"),
 
     #팔로우
     path('follow/<int:user_id>/', views.FollowView.as_view(), name='follow_view'),

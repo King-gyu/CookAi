@@ -4,13 +4,14 @@ from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
-from users.serializers import UserSerializer, MyPageSerializer, MyTokenObtainPairSerializer
+from users.serializers import UserSerializer, MyPageSerializer, MyTokenObtainPairSerializer, UserProfileSerializer
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
 from users.tokens import account_activation_token
 import traceback
 from django.shortcuts import redirect, render
 from .models import User
+from articles.models import Article
 
 from django.core.mail import send_mail
 
@@ -47,16 +48,24 @@ class FollowView(APIView):
         else:
             return Response({'mesage': '권한이 없습니다!'}, status=status.HTTP_403_FORBIDDEN)
 
-#회원정보
+# 내게시글
 class MyPageView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request, user_id):
+        ''' 회원의 아티클 받아오기'''
+        user = get_object_or_404(User, id=user_id)
+        myarticle = Article.objects.filter(user_id=user.id)
+        serial = MyPageSerializer(myarticle, many=True)
+        return Response(data=serial.data, status=status.HTTP_200_OK)
+
+#회원정보
+class UserProfileView(APIView):
+    def get(self, request, user_id):
         user = get_object_or_404(User, pk=user_id)
-        if request.user == user:
-            serializer = MyPageSerializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response({'mesage': '권한이 없습니다.'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = UserProfileSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)  
+        
+
 
 #회원정보 수정
     def put(self, request, user_id):
