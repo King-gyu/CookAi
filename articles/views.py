@@ -43,7 +43,7 @@ class CookaiView(APIView):
         
         #  Model
         model = torch.hub.load('ultralytics/yolov5', 'custom',
-                            'C:/Users/shqk1/Desktop/sp/a8/CookAi/articles/weights/best.pt')  # custom trained model
+                            'C:/Users/k_min/OneDrive/바탕 화면/project/CookAi/articles/weights/best.pt')  # custom trained model
 
         
         im = img.imgfile.path
@@ -55,28 +55,26 @@ class CookaiView(APIView):
         df = results.pandas().xyxy[0].head(1)  # im predictions (pandas)
         try :
             max_cof = max(df['confidence'])# confidence
-            
-            
+           
+           
             if max_cof < 0.85:
-                return Response({"메시지": "not found"},status=status.HTTP_200_OK)
-            
+                return Response({"메시지": "not found"},status=status.HTTP_400_BAD_REQUEST)
+           
             # # 결과값
             result = str(*df['name'].values)
-            
             sample_dict = {
                 'egg' : '계란',
                 'tofu' : '두부',
             }
-            
             api_key = get_secret('API_KEY')
             igd = sample_dict[result]
-            print(igd)
-
+            print(igd)  
             response = requests.get(f'https://openapi.foodsafetykorea.go.kr/api/{api_key}/COOKRCP01/json/1/9/RCP_NM={igd}')
             data = json.loads(response.text)
         except Exception as e :
-            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': e}, status=status.HTTP_400_BAD_REQUEST)
         return Response(data = data, status=status.HTTP_200_OK)
+    
 class TagView(APIView):
     def get(self, request):
         tags = Tag.objects.all()

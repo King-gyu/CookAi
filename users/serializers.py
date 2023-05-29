@@ -10,6 +10,7 @@ from django.utils.encoding import force_bytes
 from articles.serializers import ArticleSerializer
 from users.tokens import account_activation_token
 
+
 #회원가입
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
